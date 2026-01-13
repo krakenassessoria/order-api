@@ -1,6 +1,6 @@
 // src/app/api/clientes/analytics/route.js
-import { connectDB } from '@/lib/mongodb';
-import { AnalyticsOrderModel } from '@/models/AnalyticsOrderModel';
+import { connectDB } from '../../../../lib/mongodb.js';
+import { AnalyticsOrderModel } from '../../../../models/AnalyticsOrderModel.js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

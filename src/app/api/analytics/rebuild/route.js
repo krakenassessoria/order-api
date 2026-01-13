@@ -1,6 +1,6 @@
 // src/app/api/analytics/rebuild/route.js
-import { connectDB } from '@/lib/mongodb';
-import { OrderModel } from '@/models/OrderModel';
+import { connectDB } from '../../../../lib/mongodb.js';
+import { OrderModel } from '../../../../models/OrderModel.js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
