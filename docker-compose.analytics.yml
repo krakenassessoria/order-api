@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile.analytics
+    ports:
+      - "4001:4001"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - ANALYTICS_JOB_TOKEN=${ANALYTICS_JOB_TOKEN}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - PORT=4001
