@@ -344,11 +344,23 @@ export async function GET(req) {
       {
         $addFields: {
           userCreatedAtObj: {
-            $cond: [
-              { $eq: [{ $type: '$userCreatedAt' }, 'date'] },
-              '$userCreatedAt',
-              null
-            ]
+            $switch: {
+              branches: [
+                { case: { $eq: [{ $type: '$userCreatedAt' }, 'date'] }, then: '$userCreatedAt' },
+                {
+                  case: { $eq: [{ $type: '$userCreatedAt' }, 'string'] },
+                  then: {
+                    $dateFromString: {
+                      dateString: { $substrBytes: ['$userCreatedAt', 0, 10] },
+                      format: '%Y-%m-%d',
+                      onError: null,
+                      onNull: null,
+                    }
+                  }
+                },
+              ],
+              default: null
+            }
           }
         }
       },
