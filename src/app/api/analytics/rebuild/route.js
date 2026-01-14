@@ -1,6 +1,7 @@
 // src/app/api/analytics/rebuild/route.js
 import { connectDB } from '../../../../lib/mongodb.js';
 import { OrderModel } from '../../../../models/OrderModel.js';
+import { AnalyticsMetaModel } from '../../../../models/AnalyticsMetaModel.js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,9 +28,38 @@ export async function GET(req) {
     });
   }
 
+  const full = (searchParams.get('full') || '') === '1';
+  const sinceParam = searchParams.get('since');
+  let sinceDate = null;
+
+  if (!full) {
+    if (sinceParam) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(sinceParam)) {
+        sinceDate = new Date(`${sinceParam}T00:00:00.000Z`);
+      } else {
+        const parsed = new Date(sinceParam);
+        if (!Number.isNaN(parsed.getTime())) sinceDate = parsed;
+      }
+      if (!sinceDate) {
+        return new Response(JSON.stringify({ error: 'Parâmetro since inválido.' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    } else {
+      const meta = await AnalyticsMetaModel.findById('analyticsOrders').select({ lastRun: 1 });
+      if (meta?.lastRun) sinceDate = meta.lastRun;
+    }
+  }
+
   try {
+    const match = { type: 'order', status: 'success' };
+    if (sinceDate) {
+      match.createdAt = { $gte: sinceDate };
+    }
+
     const pipeline = [
-      { $match: { type: 'order', status: 'success' } },
+      { $match: match },
       {
         $lookup: {
           from: 'aposDocs',
@@ -144,7 +174,13 @@ export async function GET(req) {
 
     await OrderModel.aggregate(pipeline).allowDiskUse(true);
 
-    return new Response(JSON.stringify({ ok: true }), {
+    await AnalyticsMetaModel.updateOne(
+      { _id: 'analyticsOrders' },
+      { $set: { lastRun: now, updatedAt: now } },
+      { upsert: true }
+    );
+
+    return new Response(JSON.stringify({ ok: true, mode: full ? 'full' : 'incremental', since: sinceDate ? sinceDate.toISOString() : null }), {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err) {

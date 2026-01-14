@@ -23,6 +23,18 @@ docker compose -f docker-compose.analytics.yml up -d --build
 curl "https://orders.carademau.app/analytics/rebuild?token=SEU_TOKEN"
 ```
 
+## Rebuild incremental
+O rebuild passa a ser incremental por padrão (usa a última execução).
+
+- Incremental padrão:
+```bash
+curl "https://orders.carademau.app/analytics/rebuild?token=SEU_TOKEN"
+```
+- Forçar full:
+```bash
+curl "https://orders.carademau.app/analytics/rebuild?token=SEU_TOKEN&full=1"
+```
+
 ## Endpoints
 - `GET /clientes/analytics` - painel de analytics (aceita os mesmos filtros do frontend)
 - `GET /analytics/rebuild` - rebuild da coleção `analyticsOrders`
