@@ -470,7 +470,15 @@ export async function GET(req) {
           }
         }
       },
-      { $match: { userCreatedAtObj: { $ne: null } } },
+      {
+        $match: {
+          userCreatedAtObj: {
+            $ne: null,
+            ...(startDate ? { $gte: new Date(`${startDate}T00:00:00.000Z`) } : {}),
+            ...(endDate ? { $lte: new Date(`${endDate}T23:59:59.999Z`) } : {}),
+          }
+        }
+      },
       {
         $group: {
           _id: {
