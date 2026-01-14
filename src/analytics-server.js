@@ -3,6 +3,7 @@ const { pathToFileURL } = require('url');
 
 const PORT = Number(process.env.PORT || 4001);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const allowedOrigins = CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
 
 async function loadHandlers() {
   const analyticsUrl = pathToFileURL(require('path').join(__dirname, 'app', 'api', 'clientes', 'analytics', 'route.js'));
@@ -15,14 +16,20 @@ async function loadHandlers() {
   };
 }
 
-function sendCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
+function sendCors(req, res) {
+  const origin = req.headers.origin;
+  if (allowedOrigins.length === 0 || allowedOrigins.includes('*')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Analytics-Token');
 }
 
 async function handler(req, res, handlers) {
-  sendCors(res);
+  sendCors(req, res);
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
@@ -56,7 +63,7 @@ loadHandlers().then((handlers) => {
   const server = http.createServer((req, res) => {
     handler(req, res, handlers).catch((err) => {
       console.error('[analytics-server] err:', err);
-      sendCors(res);
+      sendCors(req, res);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Internal error', detail: err?.message }));
     });
