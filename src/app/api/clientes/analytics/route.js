@@ -426,6 +426,64 @@ export async function GET(req) {
       { $facet: facets },
     ]).allowDiskUse(true);
 
+    const customersByMonthMatch = {};
+    if (productIds.length) {
+      customersByMonthMatch.productsId = { $in: productIds };
+    }
+    if (estado && estado !== 'todos') {
+      customersByMonthMatch.userStateNorm = estado.toUpperCase();
+    }
+    if (city) {
+      customersByMonthMatch.userCityNorm = city.trim().toUpperCase();
+    } else if (cities.length) {
+      customersByMonthMatch.userCityNorm = { $in: cities.map(c => c.trim().toUpperCase()) };
+    }
+
+    const customersByYearMonth = await AnalyticsOrderModel.aggregate([
+      { $match: customersByMonthMatch },
+      {
+        $group: {
+          _id: '$buyerId',
+          userCreatedAt: { $first: '$userCreatedAt' },
+        }
+      },
+      {
+        $addFields: {
+          userCreatedAtObj: {
+            $switch: {
+              branches: [
+                { case: { $eq: [{ $type: '$userCreatedAt' }, 'date'] }, then: '$userCreatedAt' },
+                {
+                  case: { $eq: [{ $type: '$userCreatedAt' }, 'string'] },
+                  then: {
+                    $dateFromString: {
+                      dateString: { $substrBytes: ['$userCreatedAt', 0, 10] },
+                      format: '%Y-%m-%d',
+                      onError: null,
+                      onNull: null,
+                    }
+                  }
+                },
+              ],
+              default: null
+            }
+          }
+        }
+      },
+      { $match: { userCreatedAtObj: { $ne: null } } },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$userCreatedAtObj' },
+            month: { $month: '$userCreatedAtObj' },
+          },
+          customers: { $sum: 1 },
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      { $project: { _id: 0, year: '$_id.year', month: '$_id.month', customers: 1 } }
+    ]).allowDiskUse(true);
+
     const ordersByMonthMatch = {};
 
     if (productIds.length) {
@@ -511,7 +569,7 @@ export async function GET(req) {
       byState: customerStats?.byState || [],
       ageRanges: customerStats?.ageRanges || [],
       purchaseFrequency: customerStats?.purchaseFrequency || [],
-      customersByYearMonth: customerStats?.customersByYearMonth || [],
+      customersByYearMonth,
       ordersByYearMonth,
       productsBreakdown,
     };
