@@ -506,34 +506,66 @@ export async function GET(req) {
       ordersByMonthMatch.userCityNorm = { $in: cities.map(c => c.trim().toUpperCase()) };
     }
     if (startDate || endDate) {
-      const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
-      const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : null;
-      ordersByMonthMatch.createdAt = {
-        ...(start ? { $gte: start } : {}),
-        ...(end ? { $lte: end } : {}),
-      };
+      if (useCreatedAt) {
+        const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+        const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : null;
+        ordersByMonthMatch.createdAt = {
+          ...(start ? { $gte: start } : {}),
+          ...(end ? { $lte: end } : {}),
+        };
+      } else if (useUserCreatedAt) {
+        const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+        const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : null;
+        ordersByMonthMatch.userCreatedAt = {
+          ...(start ? { $gte: start } : {}),
+          ...(end ? { $lte: end } : {}),
+        };
+      } else {
+        ordersByMonthMatch.reservationDate = {
+          ...(startDate ? { $gte: startDate } : {}),
+          ...(endDate ? { $lte: endDate } : {}),
+        };
+      }
     }
 
     const ordersByYearMonth = await AnalyticsOrderModel.aggregate([
       { $match: ordersByMonthMatch },
       {
         $addFields: {
-          reservationDateObj: {
+          dateObj: {
             $switch: {
               branches: [
-                { case: { $eq: [{ $type: '$createdAt' }, 'date'] }, then: '$createdAt' },
+                {
+                  case: useCreatedAt,
+                  then: '$createdAt'
+                },
+                {
+                  case: useUserCreatedAt,
+                  then: '$userCreatedAt'
+                },
+                {
+                  case: true,
+                  then: {
+                    $dateFromString: {
+                      dateString: '$reservationDate',
+                      format: '%Y-%m-%d',
+                      onError: null,
+                      onNull: null,
+                    }
+                  }
+                }
               ],
               default: null
             }
           }
         }
       },
-      { $match: { reservationDateObj: { $ne: null } } },
+      { $match: { dateObj: { $ne: null } } },
       {
         $group: {
           _id: {
-            year: { $year: '$reservationDateObj' },
-            month: { $month: '$reservationDateObj' },
+            year: { $year: '$dateObj' },
+            month: { $month: '$dateObj' },
           },
           orders: { $sum: 1 },
           uniqueCustomers: { $addToSet: '$buyerId' },
